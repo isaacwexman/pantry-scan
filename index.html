@@ -163,23 +163,24 @@ function PantryScan() {
       scanningRef.current = true;
       const reader = zxingReaderRef.current;
 
-      // List video input devices and prefer the rear/environment camera
-      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-      const rear = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
-
-      await reader.decodeFromVideoDevice(rear?.deviceId, videoRef.current, (result, err) => {
-        if (!scanningRef.current) return;
-        if (result) {
-          scanningRef.current = false;
-          const code = result.getText();
-          stopCamera();
-          lookupBarcode(code);
+      await reader.decodeFromConstraints(
+        { video: { facingMode: { ideal: "environment" } } },
+        videoRef.current,
+        (result, err) => {
+          if (!scanningRef.current) return;
+          if (result) {
+            scanningRef.current = false;
+            const code = result.getText();
+            stopCamera();
+            lookupBarcode(code);
+          }
+          // NotFoundException fires continuously while no barcode is in frame — expected, ignore it
         }
-        // NotFoundException fires continuously while no barcode is in frame — expected, ignore it
-      });
-    } catch {
+      );
+    } catch (err) {
       setCameraOn(false);
-      setError("Camera access denied. Enter the barcode number below instead.");
+      const detail = err?.name ? `${err.name}: ${err.message || ""}` : String(err);
+      setError(`Camera error — ${detail}`);
     }
   };
 
