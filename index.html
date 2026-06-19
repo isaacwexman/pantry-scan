@@ -116,7 +116,7 @@ function guessFromOFF(product) {
 }
 
 function emptyForm() {
-  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", servingsPerUnit: "", minQuantity: "", notes: "" };
+  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", servingsPerUnit: "", minQuantity: "", notes: "", source: "" };
 }
 
 function PantryScan() {
@@ -224,6 +224,7 @@ function PantryScan() {
           category: CATS.includes(data.category) ? data.category : p.category,
           unit: UNITS.includes(data.unit) ? data.unit : p.unit,
           servingsPerUnit: data.servingsPerUnit ? String(data.servingsPerUnit) : p.servingsPerUnit,
+          source: data.source || "",
         }));
         setLoading(false);
         return;
@@ -245,6 +246,7 @@ function PantryScan() {
           category: guess.category,
           unit: guess.unit,
           servingsPerUnit: guess.servingsPerUnit ? String(guess.servingsPerUnit) : p.servingsPerUnit,
+          source: "openfoodfacts",
         }));
       } else {
         setError("Product not found — fill in the details below.");
@@ -270,6 +272,7 @@ function PantryScan() {
         ...(form.servingsPerUnit && { "Servings Per Unit": Number(form.servingsPerUnit) }),
         ...(form.minQuantity && { "Min Quantity": Number(form.minQuantity) }),
         ...(form.notes.trim() && { Notes: form.notes.trim() }),
+        ...(form.source && { Source: form.source }),
       };
 
       const res = await fetch(`https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}`, {
