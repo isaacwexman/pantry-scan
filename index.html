@@ -85,6 +85,7 @@
 <body>
 <div id="root"></div>
 
+<script crossorigin src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -140,15 +141,15 @@ function PantryScan() {
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const detectorRef = useRef(null);
-  const rafRef = useRef(null);
+  const zxingReaderRef = useRef(null);
+  const scanningRef = useRef(false);
 
   useEffect(() => {
-    if (typeof BarcodeDetector !== "undefined") {
-      try {
-        detectorRef.current = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-        setCameraSupported(true);
-      } catch {}
+    try {
+      zxingReaderRef.current = new ZXing.BrowserMultiFormatReader();
+      setCameraSupported(true);
+    } catch {
+      setCameraSupported(false);
     }
     return () => stopCamera();
   }, []);
@@ -158,37 +159,36 @@ function PantryScan() {
   const startCamera = async () => {
     setError("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraOn(true);
-        scanLoop();
-      }
+      setCameraOn(true);
+      scanningRef.current = true;
+      const reader = zxingReaderRef.current;
+
+      // List video input devices and prefer the rear/environment camera
+      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+      const rear = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+
+      await reader.decodeFromVideoDevice(rear?.deviceId, videoRef.current, (result, err) => {
+        if (!scanningRef.current) return;
+        if (result) {
+          scanningRef.current = false;
+          const code = result.getText();
+          stopCamera();
+          lookupBarcode(code);
+        }
+        // NotFoundException fires continuously while no barcode is in frame — expected, ignore it
+      });
     } catch {
+      setCameraOn(false);
       setError("Camera access denied. Enter the barcode number below instead.");
     }
   };
 
   const stopCamera = () => {
+    scanningRef.current = false;
+    try { zxingReaderRef.current?.reset(); } catch {}
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    cancelAnimationFrame(rafRef.current);
     setCameraOn(false);
-  };
-
-  const scanLoop = async () => {
-    if (!videoRef.current || !detectorRef.current) return;
-    try {
-      const hits = await detectorRef.current.detect(videoRef.current);
-      if (hits.length > 0) {
-        stopCamera();
-        await lookupBarcode(hits[0].rawValue);
-        return;
-      }
-    } catch {}
-    rafRef.current = requestAnimationFrame(scanLoop);
   };
 
   const lookupBarcode = async (code) => {
@@ -366,7 +366,7 @@ function PantryScan() {
                 <div className="vf-idle">
                   <div className="vf-idle-icon">📷</div>
                   <div className="vf-idle-text">
-                    {cameraSupported ? "Tap Start Camera to scan" : "Live scanning needs Chrome on Android — use manual entry below"}
+                    {cameraSupported ? "Tap Start Camera to scan" : "Camera not available — use manual entry below"}
                   </div>
                 </div>
               )}
