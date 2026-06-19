@@ -31,7 +31,10 @@
     color: #E5E0D8; font-size: 15px; padding: 11px 13px;
     outline: none; font-family: inherit; appearance: none;
     transition: border-color 0.15s;
+    min-height: 44px; box-sizing: border-box;
   }
+  input[type="date"] { min-height: 44px; line-height: 1.2; }
+  input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   input::placeholder { color: #6B6660; }
   input:focus, select:focus { border-color: #C97B2A; }
   select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6660' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; }
@@ -98,25 +101,20 @@ const UNITS = ["cans", "lbs", "oz", "gallons", "bags", "boxes", "jars", "bottles
 
 function guessFromOFF(product) {
   const name = (product.product_name || "").trim();
-  const categoriesText = (product.categories || "").toLowerCase();
+  const categoriesText = `${product.categories || ""} ${name}`.toLowerCase();
   let category = "Other";
   let unit = "units";
 
   if (categoriesText.includes("water")) { category = "Water"; unit = "gallons"; }
-  else if (categoriesText.includes("canned") || categoriesText.includes("tin")) { category = "Canned Goods"; unit = "cans"; }
-  else if (categoriesText.includes("freeze-dried") || categoriesText.includes("dehydrated")) { category = "Freeze-Dried"; unit = "bags"; }
-  else if (categoriesText.includes("pasta") || categoriesText.includes("rice") || categoriesText.includes("flour") || categoriesText.includes("grain") || categoriesText.includes("cereal")) { category = "Dry Goods"; unit = "boxes"; }
+  else if (categoriesText.includes("canned") || categoriesText.includes("tin") || categoriesText.includes("soup") || categoriesText.includes("vegetable") || categoriesText.includes("fruit") || categoriesText.includes("meat") || categoriesText.includes("fish") || categoriesText.includes("bean")) { category = "Canned Goods"; unit = "cans"; }
+  else if (categoriesText.includes("freeze-dried") || categoriesText.includes("dehydrated") || categoriesText.includes("mre")) { category = "Freeze-Dried"; unit = "bags"; }
+  else if (categoriesText.includes("pasta") || categoriesText.includes("rice") || categoriesText.includes("flour") || categoriesText.includes("grain") || categoriesText.includes("cereal") || categoriesText.includes("sugar") || categoriesText.includes("oat") || categoriesText.includes("cracker") || categoriesText.includes("baking")) { category = "Dry Goods"; unit = "boxes"; }
 
-  return {
-    name: name || "",
-    category,
-    unit,
-    servingsPerUnit: product.servings_per_container ? Math.round(product.servings_per_container) : null,
-  };
+  return { name: name || "", category, unit };
 }
 
 function emptyForm() {
-  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", servingsPerUnit: "", minQuantity: "", notes: "", source: "", cleaned: null };
+  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", caloriesPerUnit: "", minQuantity: "", notes: "", source: "", cleaned: null };
 }
 
 function PantryScan() {
@@ -223,7 +221,7 @@ function PantryScan() {
           name: data.name || p.name,
           category: CATS.includes(data.category) ? data.category : p.category,
           unit: UNITS.includes(data.unit) ? data.unit : p.unit,
-          servingsPerUnit: data.servingsPerUnit ? String(data.servingsPerUnit) : p.servingsPerUnit,
+          caloriesPerUnit: data.caloriesPerUnit ? String(data.caloriesPerUnit) : p.caloriesPerUnit,
           source: data.source || "",
           cleaned: typeof data.cleaned === "boolean" ? data.cleaned : null,
         }));
@@ -246,7 +244,7 @@ function PantryScan() {
           name: guess.name || p.name,
           category: guess.category,
           unit: guess.unit,
-          servingsPerUnit: guess.servingsPerUnit ? String(guess.servingsPerUnit) : p.servingsPerUnit,
+          // calories aren't guessable without Claude's unit-conversion math; leave for manual entry
           source: "openfoodfacts",
           cleaned: false,
         }));
@@ -271,7 +269,7 @@ function PantryScan() {
         "Quantity": Number(form.quantity) || 1,
         "Unit": form.unit,
         ...(form.expirationDate && { "Expiration Date": form.expirationDate }),
-        ...(form.servingsPerUnit && { "Servings Per Unit": Number(form.servingsPerUnit) }),
+        ...(form.caloriesPerUnit && { "Calories Per Unit": Number(form.caloriesPerUnit) }),
         ...(form.minQuantity && { "Min Quantity": Number(form.minQuantity) }),
         ...(form.notes.trim() && { Notes: form.notes.trim() }),
         ...(form.source && { Source: form.source }),
@@ -460,8 +458,8 @@ function PantryScan() {
             </div>
             <div className="row2">
               <div>
-                <label className="field-label">Servings / Unit</label>
-                <input type="number" value={form.servingsPerUnit} onChange={f("servingsPerUnit")} placeholder="e.g. 3" />
+                <label className="field-label">Calories / Unit</label>
+                <input type="number" value={form.caloriesPerUnit} onChange={f("caloriesPerUnit")} placeholder="e.g. 250" />
               </div>
               <div>
                 <label className="field-label">Min Stock</label>
