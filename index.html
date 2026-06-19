@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0F0F0E" />
+<title>Pantry Scan</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #0F0F0E; }
+  body { color: #E5E0D8; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; -webkit-font-smoothing: antialiased; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+  .app { min-height: 100vh; max-width: 430px; margin: 0 auto; padding: 28px 16px 48px; display: flex; flex-direction: column; gap: 18px; }
+
+  .hdr { display: flex; align-items: flex-start; justify-content: space-between; }
+  .wordmark { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #C97B2A; }
+  .tagline { font-size: 11px; color: #6B6660; margin-top: 3px; }
+
+  .card { background: #1A1A18; border: 1px solid #2A2A27; border-radius: 14px; padding: 20px; }
+  .card-flush { background: #1A1A18; border: 1px solid #2A2A27; border-radius: 14px; overflow: hidden; }
+
+  .field-stack { display: flex; flex-direction: column; gap: 16px; }
+  .field-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #6B6660; margin-bottom: 7px; }
+  .field-desc { font-size: 11px; color: #6B6660; margin-top: 4px; line-height: 1.5; }
+
+  input, select {
+    display: block; width: 100%;
+    background: #0F0F0E; border: 1px solid #2A2A27; border-radius: 9px;
+    color: #E5E0D8; font-size: 15px; padding: 11px 13px;
+    outline: none; font-family: inherit; appearance: none;
+    transition: border-color 0.15s;
+  }
+  input::placeholder { color: #6B6660; }
+  input:focus, select:focus { border-color: #C97B2A; }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6660' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; }
+  select option { background: #1A1A18; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .btn { display: block; width: 100%; padding: 14px 16px; border-radius: 10px; border: none; cursor: pointer; font-size: 15px; font-weight: 600; font-family: inherit; text-align: center; transition: opacity 0.15s, background 0.15s; }
+  .btn:active { opacity: 0.75; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: #C97B2A; color: #fff; }
+  .btn-ghost { background: transparent; color: #6B6660; border: 1px solid #2A2A27; }
+
+  .viewfinder { position: relative; width: 100%; aspect-ratio: 1; background: #000; }
+  video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vf-idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .vf-idle-icon { font-size: 36px; }
+  .vf-idle-text { font-size: 12px; color: #6B6660; text-align: center; padding: 0 30px; }
+
+  .corners { position: absolute; inset: 0; pointer-events: none; }
+  .corner { position: absolute; width: 26px; height: 26px; border-color: #C97B2A; border-style: solid; }
+  .tl { top: 18px; left: 18px; border-width: 2px 0 0 2px; border-radius: 5px 0 0 0; }
+  .tr { top: 18px; right: 18px; border-width: 2px 2px 0 0; border-radius: 0 5px 0 0; }
+  .bl { bottom: 18px; left: 18px; border-width: 0 0 2px 2px; border-radius: 0 0 0 5px; }
+  .br { bottom: 18px; right: 18px; border-width: 0 2px 2px 0; border-radius: 0 0 5px 0; }
+  .scanline { position: absolute; left: 18px; right: 18px; height: 1px; background: #C97B2A; opacity: 0.8; animation: sweep 2.2s ease-in-out infinite; }
+  @keyframes sweep { 0%, 100% { top: 22%; } 50% { top: 76%; } }
+
+  .vf-actions { padding: 14px 16px; display: flex; gap: 10px; }
+
+  .divider { display: flex; align-items: center; gap: 10px; color: #6B6660; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #2A2A27; }
+
+  .pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 5px; font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; background: #C97B2A22; color: #C97B2A; }
+
+  .alert { border-radius: 9px; padding: 11px 13px; font-size: 13px; line-height: 1.5; }
+  .alert-error { background: #2A1A1A; border: 1px solid #4A2020; color: #D08080; }
+  .alert-info { background: #1A1A18; border: 1px solid #2A2A27; color: #6B6660; }
+
+  .success-wrap { padding: 44px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+  .check-ring { width: 58px; height: 58px; border-radius: 50%; border: 2px solid #2A4A2A; background: #1A2A1A; display: flex; align-items: center; justify-content: center; color: #7ABB7A; font-size: 22px; margin-bottom: 10px; }
+  .success-name { font-size: 18px; font-weight: 600; }
+  .success-meta { font-size: 13px; color: #6B6660; margin-bottom: 18px; }
+
+  .loading-pulse { color: #6B6660; font-size: 13px; }
+
+  .section-title { font-size: 15px; font-weight: 600; }
+  .section-sub { font-size: 13px; color: #6B6660; margin-top: 3px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+const CATS = ["Canned Goods", "Dry Goods", "Freeze-Dried", "Water", "Other"];
+const UNITS = ["cans", "lbs", "oz", "gallons", "bags", "boxes", "jars", "bottles", "packets", "units"];
+
+function guessFromOFF(product) {
+  const name = (product.product_name || "").trim();
+  const categoriesText = (product.categories || "").toLowerCase();
+  let category = "Other";
+  let unit = "units";
+
+  if (categoriesText.includes("water")) { category = "Water"; unit = "gallons"; }
+  else if (categoriesText.includes("canned") || categoriesText.includes("tin")) { category = "Canned Goods"; unit = "cans"; }
+  else if (categoriesText.includes("freeze-dried") || categoriesText.includes("dehydrated")) { category = "Freeze-Dried"; unit = "bags"; }
+  else if (categoriesText.includes("pasta") || categoriesText.includes("rice") || categoriesText.includes("flour") || categoriesText.includes("grain") || categoriesText.includes("cereal")) { category = "Dry Goods"; unit = "boxes"; }
+
+  return {
+    name: name || "",
+    category,
+    unit,
+    servingsPerUnit: product.servings_per_container ? Math.round(product.servings_per_container) : null,
+  };
+}
+
+function emptyForm() {
+  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", servingsPerUnit: "", minQuantity: "", notes: "" };
+}
+
+function PantryScan() {
+  const savedConfig = (() => {
+    try { return JSON.parse(localStorage.getItem("pantry-scan-config") || "{}"); } catch { return {}; }
+  })();
+
+  const [screen, setScreen] = useState(savedConfig.apiKey && savedConfig.baseId ? "scan" : "setup");
+  const [config, setConfig] = useState({
+    apiKey: savedConfig.apiKey || "",
+    baseId: savedConfig.baseId || "",
+    tableName: savedConfig.tableName || "Inventory",
+    proxyUrl: savedConfig.proxyUrl || "",
+    appToken: savedConfig.appToken || "",
+  });
+  const [form, setForm] = useState(emptyForm());
+  const [manualCode, setManualCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [cameraSupported, setCameraSupported] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
+
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const detectorRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof BarcodeDetector !== "undefined") {
+      try {
+        detectorRef.current = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+        setCameraSupported(true);
+      } catch {}
+    }
+    return () => stopCamera();
+  }, []);
+
+  const f = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const startCamera = async () => {
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraOn(true);
+        scanLoop();
+      }
+    } catch {
+      setError("Camera access denied. Enter the barcode number below instead.");
+    }
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    cancelAnimationFrame(rafRef.current);
+    setCameraOn(false);
+  };
+
+  const scanLoop = async () => {
+    if (!videoRef.current || !detectorRef.current) return;
+    try {
+      const hits = await detectorRef.current.detect(videoRef.current);
+      if (hits.length > 0) {
+        stopCamera();
+        await lookupBarcode(hits[0].rawValue);
+        return;
+      }
+    } catch {}
+    rafRef.current = requestAnimationFrame(scanLoop);
+  };
+
+  const lookupBarcode = async (code) => {
+    setLoading(true);
+    setError("");
+    setScreen("confirm");
+
+    let product = null;
+    try {
+      const offRes = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const offData = await offRes.json();
+      if (offData.status === 1) product = offData.product;
+    } catch {}
+
+    if (!product) {
+      setError("Product not found in database — fill in the details below.");
+      setLoading(false);
+      return;
+    }
+
+    // Try the Claude proxy first, if configured
+    if (config.proxyUrl && config.appToken) {
+      try {
+        const proxyRes = await fetch(config.proxyUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-App-Token": config.appToken },
+          body: JSON.stringify({
+            barcode: code,
+            rawName: product.product_name || "",
+            rawCategories: product.categories || "",
+            rawServings: product.servings_per_container ?? null,
+          }),
+        });
+        if (proxyRes.ok) {
+          const cleaned = await proxyRes.json();
+          setForm((p) => ({
+            ...p,
+            name: cleaned.name || p.name,
+            category: CATS.includes(cleaned.category) ? cleaned.category : p.category,
+            unit: UNITS.includes(cleaned.unit) ? cleaned.unit : p.unit,
+            servingsPerUnit: cleaned.servingsPerUnit ? String(cleaned.servingsPerUnit) : p.servingsPerUnit,
+          }));
+          setLoading(false);
+          return;
+        }
+      } catch {}
+      // fall through to heuristic if proxy call failed
+    }
+
+    // Fallback: simple keyword-based guess, no AI
+    const guess = guessFromOFF(product);
+    setForm((p) => ({
+      ...p,
+      name: guess.name || p.name,
+      category: guess.category,
+      unit: guess.unit,
+      servingsPerUnit: guess.servingsPerUnit ? String(guess.servingsPerUnit) : p.servingsPerUnit,
+    }));
+    setLoading(false);
+  };
+
+  const saveToAirtable = async () => {
+    if (!form.name.trim()) { setError("Item name is required."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const fields = {
+        "Item Name": form.name.trim(),
+        "Category": form.category,
+        "Quantity": Number(form.quantity) || 1,
+        "Unit": form.unit,
+        ...(form.expirationDate && { "Expiration Date": form.expirationDate }),
+        ...(form.servingsPerUnit && { "Servings Per Unit": Number(form.servingsPerUnit) }),
+        ...(form.minQuantity && { "Min Quantity": Number(form.minQuantity) }),
+        ...(form.notes.trim() && { Notes: form.notes.trim() }),
+      };
+
+      const res = await fetch(`https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `Airtable error (${res.status})`);
+      }
+      setScreen("success");
+    } catch (e) {
+      setError(e.message || "Couldn't save — check your API key and Base ID in Settings.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const nextScan = () => {
+    setForm(emptyForm());
+    setManualCode("");
+    setError("");
+    setScreen("scan");
+  };
+
+  return (
+    <div className="app">
+      <div className="hdr">
+        <div>
+          <div className="wordmark">Pantry Scan</div>
+          <div className="tagline">Backstock inventory</div>
+        </div>
+        {screen !== "setup" && (
+          <button className="btn btn-ghost" style={{ width: "auto", padding: "6px 12px", fontSize: "12px" }}
+            onClick={() => { stopCamera(); setScreen("setup"); }}>
+            Settings
+          </button>
+        )}
+      </div>
+
+      {screen === "setup" && (
+        <div className="card field-stack">
+          <div>
+            <div className="section-title">Connect Airtable</div>
+            <div className="section-sub">Stored only on this device, in this browser.</div>
+          </div>
+          <div>
+            <label className="field-label">Personal Access Token</label>
+            <input type="password" placeholder="pat·····················" value={config.apiKey}
+              onChange={(e) => setConfig((p) => ({ ...p, apiKey: e.target.value }))} />
+            <div className="field-desc">airtable.com → Account → Developer Hub → Personal access tokens</div>
+          </div>
+          <div>
+            <label className="field-label">Base ID</label>
+            <input type="text" placeholder="appXXXXXXXXXXXXXX" value={config.baseId}
+              onChange={(e) => setConfig((p) => ({ ...p, baseId: e.target.value }))} />
+            <div className="field-desc">From your base URL: airtable.com/<strong style={{ color: "#E5E0D8" }}>appXXX</strong>/...</div>
+          </div>
+          <div>
+            <label className="field-label">Table Name</label>
+            <input type="text" value={config.tableName}
+              onChange={(e) => setConfig((p) => ({ ...p, tableName: e.target.value }))} />
+          </div>
+
+          <div className="divider">claude cleanup (optional)</div>
+
+          <div>
+            <label className="field-label">Worker Proxy URL</label>
+            <input type="text" placeholder="https://pantry-scan-proxy.yoursubdomain.workers.dev" value={config.proxyUrl}
+              onChange={(e) => setConfig((p) => ({ ...p, proxyUrl: e.target.value }))} />
+            <div className="field-desc">From your Cloudflare Worker, after deploying</div>
+          </div>
+          <div>
+            <label className="field-label">App Token</label>
+            <input type="password" placeholder="the random string you set as APP_TOKEN" value={config.appToken}
+              onChange={(e) => setConfig((p) => ({ ...p, appToken: e.target.value }))} />
+            <div className="field-desc">Must match the APP_TOKEN secret on your Worker. Leave both blank to use basic keyword matching instead.</div>
+          </div>
+
+          {error && <div className="alert alert-error">{error}</div>}
+          <button className="btn btn-primary" onClick={() => {
+            if (!config.apiKey || !config.baseId) { setError("API token and Base ID are both required."); return; }
+            setError("");
+            try { localStorage.setItem("pantry-scan-config", JSON.stringify(config)); } catch {}
+            setScreen("scan");
+          }}>
+            Save & Start Scanning
+          </button>
+        </div>
+      )}
+
+      {screen === "scan" && (
+        <>
+          <div className="card-flush">
+            <div className="viewfinder">
+              <video ref={videoRef} muted playsInline style={{ display: cameraOn ? "block" : "none" }} />
+              {!cameraOn && (
+                <div className="vf-idle">
+                  <div className="vf-idle-icon">📷</div>
+                  <div className="vf-idle-text">
+                    {cameraSupported ? "Tap Start Camera to scan" : "Live scanning needs Chrome on Android — use manual entry below"}
+                  </div>
+                </div>
+              )}
+              <div className="corners">
+                <div className="corner tl" /><div className="corner tr" /><div className="corner bl" /><div className="corner br" />
+                {cameraOn && <div className="scanline" />}
+              </div>
+            </div>
+            <div className="vf-actions">
+              {cameraSupported && (
+                cameraOn
+                  ? <button className="btn btn-ghost" style={{ flex: 1 }} onClick={stopCamera}>Stop</button>
+                  : <button className="btn btn-primary" style={{ flex: 1 }} onClick={startCamera}>Start Camera</button>
+              )}
+            </div>
+          </div>
+
+          <div className="divider">or enter manually</div>
+
+          <div className="card field-stack">
+            <div>
+              <label className="field-label">Barcode Number</label>
+              <input type="tel" placeholder="e.g. 0041331024203" value={manualCode}
+                onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ""))} />
+            </div>
+            <button className="btn btn-primary" disabled={!manualCode || loading} onClick={() => lookupBarcode(manualCode)}>
+              {loading ? "Looking up…" : "Look Up Barcode"}
+            </button>
+            <button className="btn btn-ghost" onClick={() => { setError(""); setScreen("confirm"); }}>
+              Skip — Add Item Manually
+            </button>
+          </div>
+
+          {error && <div className="alert alert-error">{error}</div>}
+        </>
+      )}
+
+      {screen === "confirm" && (
+        loading ? (
+          <div className="card" style={{ padding: "40px 20px", textAlign: "center" }}>
+            <div className="loading-pulse">Looking up product…</div>
+          </div>
+        ) : (
+          <div className="card field-stack">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div className="section-title">Confirm Item</div>
+              <span className="pill">Review</span>
+            </div>
+            <div>
+              <label className="field-label">Item Name *</label>
+              <input value={form.name} onChange={f("name")} placeholder="e.g. Black Beans" />
+            </div>
+            <div>
+              <label className="field-label">Category</label>
+              <select value={form.category} onChange={f("category")}>
+                {CATS.map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="row2">
+              <div>
+                <label className="field-label">Quantity</label>
+                <input type="number" min="1" value={form.quantity} onChange={f("quantity")} />
+              </div>
+              <div>
+                <label className="field-label">Unit</label>
+                <select value={form.unit} onChange={f("unit")}>
+                  {UNITS.map((u) => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Expiration Date</label>
+              <input type="date" value={form.expirationDate} onChange={f("expirationDate")} />
+            </div>
+            <div className="row2">
+              <div>
+                <label className="field-label">Servings / Unit</label>
+                <input type="number" value={form.servingsPerUnit} onChange={f("servingsPerUnit")} placeholder="e.g. 3" />
+              </div>
+              <div>
+                <label className="field-label">Min Stock</label>
+                <input type="number" value={form.minQuantity} onChange={f("minQuantity")} placeholder="e.g. 6" />
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Notes</label>
+              <input value={form.notes} onChange={f("notes")} placeholder="Optional" />
+            </div>
+            {error && <div className="alert alert-error">{error}</div>}
+            <button className="btn btn-primary" onClick={saveToAirtable} disabled={loading}>
+              {loading ? "Saving…" : "Add to Pantry"}
+            </button>
+            <button className="btn btn-ghost" onClick={() => { setError(""); setScreen("scan"); }}>
+              ← Back to Scan
+            </button>
+          </div>
+        )
+      )}
+
+      {screen === "success" && (
+        <div className="card">
+          <div className="success-wrap">
+            <div className="check-ring">✓</div>
+            <div className="success-name">{form.name}</div>
+            <div className="success-meta">
+              {form.quantity} {form.unit} · {form.category}
+              {form.expirationDate && ` · Exp ${form.expirationDate}`}
+            </div>
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={nextScan}>
+              Scan Next Item
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<PantryScan />);
+</script>
+</body>
+</html>
