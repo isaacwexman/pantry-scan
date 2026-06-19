@@ -114,7 +114,7 @@ function guessFromOFF(product) {
 }
 
 function emptyForm() {
-  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", caloriesPerUnit: "", minQuantity: "", notes: "", source: "", cleaned: null };
+  return { name: "", category: "Canned Goods", quantity: "1", unit: "cans", expirationDate: "", servingsPerUnit: "", caloriesPerServing: "", minQuantity: "", notes: "", source: "", cleaned: null };
 }
 
 function PantryScan() {
@@ -221,7 +221,8 @@ function PantryScan() {
           name: data.name || p.name,
           category: CATS.includes(data.category) ? data.category : p.category,
           unit: UNITS.includes(data.unit) ? data.unit : p.unit,
-          caloriesPerUnit: data.caloriesPerUnit ? String(data.caloriesPerUnit) : p.caloriesPerUnit,
+          servingsPerUnit: data.servingsPerUnit ? String(data.servingsPerUnit) : p.servingsPerUnit,
+          caloriesPerServing: data.caloriesPerServing ? String(data.caloriesPerServing) : p.caloriesPerServing,
           source: data.source || "",
           cleaned: typeof data.cleaned === "boolean" ? data.cleaned : null,
         }));
@@ -269,7 +270,8 @@ function PantryScan() {
         "Quantity": Number(form.quantity) || 1,
         "Unit": form.unit,
         ...(form.expirationDate && { "Expiration Date": form.expirationDate }),
-        ...(form.caloriesPerUnit && { "Calories Per Unit": Number(form.caloriesPerUnit) }),
+        ...(form.servingsPerUnit && { "Servings Per Unit": Number(form.servingsPerUnit) }),
+        ...(form.caloriesPerServing && { "Calories Per Serving": Number(form.caloriesPerServing) }),
         ...(form.minQuantity && { "Min Quantity": Number(form.minQuantity) }),
         ...(form.notes.trim() && { Notes: form.notes.trim() }),
         ...(form.source && { Source: form.source }),
@@ -458,13 +460,17 @@ function PantryScan() {
             </div>
             <div className="row2">
               <div>
-                <label className="field-label">Calories / Unit</label>
-                <input type="number" value={form.caloriesPerUnit} onChange={f("caloriesPerUnit")} placeholder="e.g. 250" />
+                <label className="field-label">Servings / Unit</label>
+                <input type="number" value={form.servingsPerUnit} onChange={f("servingsPerUnit")} placeholder="e.g. 4" />
               </div>
               <div>
-                <label className="field-label">Min Stock</label>
-                <input type="number" value={form.minQuantity} onChange={f("minQuantity")} placeholder="e.g. 6" />
+                <label className="field-label">Calories / Serving</label>
+                <input type="number" value={form.caloriesPerServing} onChange={f("caloriesPerServing")} placeholder="e.g. 90" />
               </div>
+            </div>
+            <div>
+              <label className="field-label">Min Stock</label>
+              <input type="number" value={form.minQuantity} onChange={f("minQuantity")} placeholder="e.g. 6" />
             </div>
             <div>
               <label className="field-label">Notes</label>
