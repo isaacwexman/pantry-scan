@@ -197,58 +197,63 @@ function PantryScan() {
     setError("");
     setScreen("confirm");
 
-    let product = null;
-    try {
-      const offRes = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-      const offData = await offRes.json();
-      if (offData.status === 1) product = offData.product;
-    } catch {}
-
-    if (!product) {
-      setError("Product not found in database — fill in the details below.");
-      setLoading(false);
-      return;
-    }
-
-    // Try the Claude proxy first, if configured
+    // Preferred path: proxy handles OFF + USDA fallback + Claude cleanup server-side
     if (config.proxyUrl && config.appToken) {
       try {
         const proxyRes = await fetch(config.proxyUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-App-Token": config.appToken },
-          body: JSON.stringify({
-            barcode: code,
-            rawName: product.product_name || "",
-            rawCategories: product.categories || "",
-            rawServings: product.servings_per_container ?? null,
-          }),
+          body: JSON.stringify({ barcode: code }),
         });
-        if (proxyRes.ok) {
-          const cleaned = await proxyRes.json();
-          setForm((p) => ({
-            ...p,
-            name: cleaned.name || p.name,
-            category: CATS.includes(cleaned.category) ? cleaned.category : p.category,
-            unit: UNITS.includes(cleaned.unit) ? cleaned.unit : p.unit,
-            servingsPerUnit: cleaned.servingsPerUnit ? String(cleaned.servingsPerUnit) : p.servingsPerUnit,
-          }));
+        const data = await proxyRes.json();
+
+        if (data.notFound) {
+          setError("Product not found in any database — fill in the details below.");
           setLoading(false);
           return;
         }
-      } catch {}
-      // fall through to heuristic if proxy call failed
+        if (data.error) {
+          setError(`Lookup service error: ${data.error}`);
+          setLoading(false);
+          return;
+        }
+
+        setForm((p) => ({
+          ...p,
+          name: data.name || p.name,
+          category: CATS.includes(data.category) ? data.category : p.category,
+          unit: UNITS.includes(data.unit) ? data.unit : p.unit,
+          servingsPerUnit: data.servingsPerUnit ? String(data.servingsPerUnit) : p.servingsPerUnit,
+        }));
+        setLoading(false);
+        return;
+      } catch {
+        setError("Couldn't reach the lookup proxy — trying Open Food Facts directly instead.");
+        // fall through to direct OFF lookup below
+      }
     }
 
-    // Fallback: simple keyword-based guess, no AI
-    const guess = guessFromOFF(product);
-    setForm((p) => ({
-      ...p,
-      name: guess.name || p.name,
-      category: guess.category,
-      unit: guess.unit,
-      servingsPerUnit: guess.servingsPerUnit ? String(guess.servingsPerUnit) : p.servingsPerUnit,
-    }));
-    setLoading(false);
+    // Fallback path: no proxy configured (or it failed) — call OFF directly, basic keyword guess only
+    try {
+      const offRes = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const offData = await offRes.json();
+      if (offData.status === 1 && offData.product?.product_name) {
+        const guess = guessFromOFF(offData.product);
+        setForm((p) => ({
+          ...p,
+          name: guess.name || p.name,
+          category: guess.category,
+          unit: guess.unit,
+          servingsPerUnit: guess.servingsPerUnit ? String(guess.servingsPerUnit) : p.servingsPerUnit,
+        }));
+      } else {
+        setError("Product not found — fill in the details below.");
+      }
+    } catch {
+      setError("Lookup failed — check your connection or fill in manually.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveToAirtable = async () => {
