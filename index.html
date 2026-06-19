@@ -279,8 +279,13 @@ function PantryScan() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || `Airtable error (${res.status})`);
+        const errText = await res.text();
+        let detail = errText;
+        try {
+          const parsed = JSON.parse(errText);
+          detail = parsed.error?.message || parsed.error?.type || errText;
+        } catch {}
+        throw new Error(`Airtable ${res.status}: ${detail}`);
       }
       setScreen("success");
     } catch (e) {
